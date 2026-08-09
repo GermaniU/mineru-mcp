@@ -5,12 +5,26 @@ Servidor MCP (Model Context Protocol) que conecta Claude —o cualquier cliente 
 ## Arquitectura
 
 ```
-Claude (Windows) ──stdio──> mineru_mcp.py (Python, venv en WSL) ──HTTP──> mineru-api :8000 (WSL, systemd)
+Cliente MCP ──stdio o HTTP/SSE──> mineru_mcp.py (Python) ──HTTP──> mineru-api :8000
 ```
 
-- El MCP es un solo archivo (`mineru_mcp.py`) sobre `mcp` + `httpx`.
-- MinerU corre como servicio systemd en WSL; modelos locales en `~/.cache/huggingface` (PDF-Extract-Kit + MinerU2.5 VLM 1.2B).
+- El MCP es un solo archivo (`mineru_mcp.py`) sobre `fastmcp` + `httpx` + `uvicorn`.
+- Dos modos de transporte, elegibles al arrancar:
+  - **HTTP/SSE** (default): levanta un servidor propio en `MCP_PORT` (default `8202`), pensado para que lo consuma un cliente remoto en la misma red.
+  - **stdio** (`--stdio` o `MCP_TRANSPORT=stdio`): el modo estándar para que un cliente MCP local (Claude Desktop, Claude Code, etc.) lo lance como subproceso.
+- MinerU corre aparte, como servidor HTTP propio (`mineru-api`, del paquete `mineru[api]`) escuchando en `MINERU_URL` (default `http://127.0.0.1:8000`).
 - Guardia de seguridad: si `MINERU_URL` no es localhost/interna, el MCP **bloquea el envío** de documentos.
+- Los archivos se envían por `file_path` (si el proceso de MinerU puede leerlos directo del filesystem) o por `file_base64` + `file_name` (para callers remotos, que no comparten filesystem con el servidor) — en ese caso se decodifican a un temporal y se borran al terminar.
+
+### Coordinación de GPU (opcional)
+
+Si tu setup corre otros procesos que compiten por VRAM (un LLM local, ComfyUI, etc.), `mineru_mcp.py` intenta coordinar antes de usar `backend=hybrid-engine` o `vlm-engine` (los que sí usan GPU):
+
+1. Si existe y es ejecutable un script en `~/stack/gpu-broker/gpu-broker.sh`, lo invoca para liberar VRAM antes de parsear y volver a arrancar lo que haya frenado al terminar.
+2. Si no existe, hace un fallback best-effort: si hay un servicio `systemd` llamado `comfyui.service` activo, lo detiene mientras dura el parseo.
+3. Si ninguno de los dos aplica a tu máquina, esta parte simplemente no hace nada — `backend=pipeline` (el default) nunca la toca.
+
+No es necesario tener nada de esto para usar el MCP; es un ajuste pensado para un home-lab con GPU compartida entre varios servicios.
 
 ## Tools expuestas
 
@@ -32,8 +46,8 @@ Claude (Windows) ──stdio──> mineru_mcp.py (Python, venv en WSL) ──HT
 ### Gotchas aprendidas (a la mala)
 
 1. **`effort=medium` fuerza `image_analysis=off`** — está en `hybrid_analyze.py` de MinerU, no documentado. Para describir figuras: `hybrid-engine` + `effort=high` + `image_analysis=true`.
-2. **systemd**: `mineru-api` crea `output/` relativo al cwd → sin `WorkingDirectory=` en la unit da `PermissionError` (HTTP 500).
-3. `nohup ... &` vía `wsl -e` muere al salir wsl.exe — para daemons en WSL, siempre systemd.
+2. **`mineru-api` (systemd)**: crea `output/` relativo al cwd → sin `WorkingDirectory=` en la unit da `PermissionError` (HTTP 500).
+3. Lanzar `mineru-api`/`mineru_mcp.py` con `nohup ... &` desde una sesión que se cierra mata el proceso — para dejarlo corriendo como servicio, usar `systemd` (o el gestor de procesos equivalente de tu SO).
 4. Celdas de tabla con badges de color quedan vacías incluso en `effort=high` (limitación de MinerU 3.4.0).
 
 ## Resultados reales (RTX 3060 12GB)
@@ -44,32 +58,50 @@ Claude (Windows) ──stdio──> mineru_mcp.py (Python, venv en WSL) ──HT
 ## Instalación
 
 ```bash
-# En WSL
 python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt   # instala mineru[api] + mcp + httpx
+.venv/bin/pip install -r requirements.txt   # instala fastmcp + httpx + uvicorn
+.venv/bin/pip install "mineru[api]"         # el servidor MinerU en sí
 
-# Servicio systemd: /etc/systemd/system/mineru-api.service
-[Unit]
-Description=MinerU API server (PDF/document parsing)
-After=network.target
-[Service]
-User=<usuario>
-WorkingDirectory=/ruta/al/repo          # ¡obligatorio! (gotcha #2)
-ExecStart=/ruta/al/repo/.venv/bin/mineru-api --host 127.0.0.1 --port 8000
-Restart=on-failure
-[Install]
-WantedBy=multi-user.target
+cp .env.example .env   # y ajustar según tu setup
+
+# levantar mineru-api (servidor de parsing)
+.venv/bin/mineru-api --host 127.0.0.1 --port 8000
+
+# levantar el MCP — HTTP/SSE (default, puerto 8202)
+.venv/bin/python mineru_mcp.py
+
+# o en modo stdio, para que un cliente MCP local lo lance como subproceso
+.venv/bin/python mineru_mcp.py --stdio
 ```
 
-Registro del MCP en Claude Code (`.claude.json`), desde Windows hacia WSL:
+Para dejar `mineru-api` corriendo como servicio de fondo (recomendado), usar `systemd` con `WorkingDirectory=` apuntando al repo (ver gotcha #2) — o el gestor de procesos equivalente en tu plataforma.
+
+### Registrar el MCP en un cliente
+
+**stdio** (Claude Code, Claude Desktop, cualquier cliente en la misma máquina):
 
 ```json
 "mineru": {
   "type": "stdio",
-  "command": "wsl.exe",
-  "args": ["-e", "/mnt/c/Sites/mineru-mcp/.venv/bin/python", "/mnt/c/Sites/mineru-mcp/mineru_mcp.py"],
+  "command": "/ruta/al/repo/.venv/bin/python",
+  "args": ["/ruta/al/repo/mineru_mcp.py", "--stdio"],
   "env": { "MINERU_URL": "http://localhost:8000", "MINERU_BACKEND": "pipeline", "MINERU_LANG": "es" }
 }
 ```
 
-Variables de entorno: ver `.env.example`.
+**HTTP/SSE** (servidor corriendo aparte, ej. accesible desde otra máquina de la LAN):
+
+```json
+"mineru": {
+  "type": "http",
+  "url": "http://<host-donde-corre-el-mcp>:8202"
+}
+```
+
+⚠️ El servidor HTTP escucha en `0.0.0.0` por defecto y no tiene autenticación — pensado para redes internas de confianza. Si lo expones a una red no confiable, pon un proxy con auth delante.
+
+Variables de entorno: ver `.env.example` (`MINERU_URL`, `MINERU_BACKEND`, `MINERU_PARSE_METHOD`, `MINERU_LANG`) y además `MCP_PORT` (default `8202`) y `MCP_HOST` (default `0.0.0.0`).
+
+## Licencia
+
+[MIT](LICENSE).
