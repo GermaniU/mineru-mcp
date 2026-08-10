@@ -125,7 +125,7 @@ Retrieves backend engine health: `mineru-api` availability and system resource u
 {
   "mcpServers": {
     "mineru": {
-      "url": "http://192.168.68.108:8202/mcp"
+      "url": "http://<YOUR_SERVER_IP>:8202/mcp"
     }
   }
 }
@@ -136,7 +136,7 @@ Retrieves backend engine health: `mineru-api` availability and system resource u
 ```yaml
 mcp_servers:
   mineru:
-    url: "http://192.168.68.108:8202/mcp"
+    url: "http://<YOUR_SERVER_IP>:8202/mcp"
     transport: "http"
 ```
 

@@ -87,4 +87,4 @@
 ## 🔒 Red y Seguridad
 
 - **Loopback Interno**: `mineru-api` escucha en `127.0.0.1:8002` para evitar exponer la API interna sin autenticar a la red externa.
-- **MCP LAN Binding**: El MCP server escucha en `0.0.0.0:8202`, protegido por reglas UFW del host (`ufw allow from 192.168.68.0/24`).
+- **MCP LAN Binding**: El MCP server escucha en `0.0.0.0:8202`, protegido por reglas UFW del host (`ufw allow from <YOUR_LAN_CIDR>`).

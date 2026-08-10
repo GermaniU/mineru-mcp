@@ -125,7 +125,7 @@ Obtiene el estado de salud del backend: disponibilidad de `mineru-api` y uso de 
 {
   "mcpServers": {
     "mineru": {
-      "url": "http://192.168.68.108:8202/mcp"
+      "url": "http://<YOUR_SERVER_IP>:8202/mcp"
     }
   }
 }
@@ -136,7 +136,7 @@ Obtiene el estado de salud del backend: disponibilidad de `mineru-api` y uso de 
 ```yaml
 mcp_servers:
   mineru:
-    url: "http://192.168.68.108:8202/mcp"
+    url: "http://<YOUR_SERVER_IP>:8202/mcp"
     transport: "http"
 ```
 

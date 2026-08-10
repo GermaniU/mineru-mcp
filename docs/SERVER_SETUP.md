@@ -46,10 +46,10 @@ After=network.target
 
 [Service]
 Type=simple
-User=germani
-WorkingDirectory=/home/germani/stack/mineru-api
-Environment="PATH=/home/germani/stack/mineru-api/.venv/bin:/usr/bin"
-ExecStart=/home/germani/stack/mineru-api/.venv/bin/mineru-api --host 127.0.0.1 --port 8002
+User=<YOUR_USER>
+WorkingDirectory=<HOME>/stack/mineru-api
+Environment="PATH=<HOME>/stack/mineru-api/.venv/bin:/usr/bin"
+ExecStart=<HOME>/stack/mineru-api/.venv/bin/mineru-api --host 127.0.0.1 --port 8002
 Restart=always
 RestartSec=5
 
@@ -66,13 +66,13 @@ After=network.target mineru-api.service
 
 [Service]
 Type=simple
-User=germani
-WorkingDirectory=/home/germani/Sites/mineru-mcp
-Environment="PATH=/home/germani/Sites/mineru-mcp/.venv/bin:/usr/bin"
+User=<YOUR_USER>
+WorkingDirectory=<HOME>/Sites/mineru-mcp
+Environment="PATH=<HOME>/Sites/mineru-mcp/.venv/bin:/usr/bin"
 Environment="MINERU_API_URL=http://127.0.0.1:8002"
 Environment="MCP_PORT=8202"
 Environment="MCP_HOST=0.0.0.0"
-ExecStart=/home/germani/Sites/mineru-mcp/.venv/bin/python -m mineru_mcp.server
+ExecStart=<HOME>/Sites/mineru-mcp/.venv/bin/python -m mineru_mcp.server
 Restart=always
 RestartSec=3
 
@@ -89,9 +89,9 @@ Si se utiliza el backend `hybrid-engine` o `vlm-engine` que consume VRAM (~4GB),
 ```ini
 # /etc/sudoers.d/gpu-arbiter
 # Permisos limitados para el arbitraje de GPU
-germani ALL=(ALL) NOPASSWD: /usr/bin/systemctl start mineru-api.service
-germani ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop mineru-api.service
-germani ALL=(ALL) NOPASSWD: /usr/bin/systemctl is-active mineru-api.service
+<YOUR_USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl start mineru-api.service
+<YOUR_USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop mineru-api.service
+<YOUR_USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl is-active mineru-api.service
 ```
 
 > **Importante**: El archivo `/etc/sudoers.d/gpu-arbiter` debe tener permisos `0440` (`sudo chmod 0440 /etc/sudoers.d/gpu-arbiter`).
@@ -103,6 +103,6 @@ germani ALL=(ALL) NOPASSWD: /usr/bin/systemctl is-active mineru-api.service
 Para permitir que otros nodos de la red LAN consuman el MCP en el puerto `8202`:
 
 ```bash
-sudo ufw allow from 192.168.68.0/24 to any port 8202 proto tcp comment "MinerU MCP HTTP"
+sudo ufw allow from <YOUR_LAN_CIDR> to any port 8202 proto tcp comment "MinerU MCP HTTP"
 sudo ufw reload
 ```
