@@ -89,6 +89,7 @@ Crea un archivo `.env` o exporta las siguientes variables:
 | `MINERU_API_URL` | `http://127.0.0.1:8002` | URL loopback donde escucha `mineru-api`. |
 | `MCP_HOST` | `0.0.0.0` | Host binding para el servidor MCP. |
 | `MCP_PORT` | `8202` | Puerto HTTP/SSE del servidor MCP. |
+| `MCP_AUTH_TOKEN` | *(vacío = sin auth)* | Si se define, exige header `Authorization: Bearer <token>` en cada request HTTP/SSE. |
 | `UPLOAD_DIR` | `/tmp/mineru_uploads` | Directorio temporal para decodificar PDFs Base64. |
 
 ---

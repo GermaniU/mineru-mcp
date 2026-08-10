@@ -1,7 +1,11 @@
 """Tests de config: constantes y validaciones."""
 
-from mineru_mcp.config import (GPU_BACKENDS, MINERU_IS_EXTERNAL, MINERU_URL,
-                               SUPPORTED_EXTENSIONS, SUPPORTED_LANGS)
+from mineru_mcp.config import (
+    GPU_BACKENDS,
+    MINERU_IS_EXTERNAL,
+    SUPPORTED_EXTENSIONS,
+    SUPPORTED_LANGS,
+)
 
 
 def test_mineru_url_local():

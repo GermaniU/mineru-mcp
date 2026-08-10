@@ -12,7 +12,7 @@ def _client(timeout: float = DEFAULT_TIMEOUT) -> httpx.AsyncClient:
 async def file_parse(path, form: dict, timeout: float = PARSE_TIMEOUT) -> dict:
     """Envía un archivo a /file_parse (síncrono)."""
     async with _client(timeout=timeout) as c:
-        with open(path, "rb") as f:
+        with open(path, "rb") as f:  # noqa: ASYNC230
             r = await c.post("/file_parse", files={"files": (path.name, f, _mime(path))}, data=form)
         r.raise_for_status()
         return r.json()
@@ -21,7 +21,7 @@ async def file_parse(path, form: dict, timeout: float = PARSE_TIMEOUT) -> dict:
 async def submit_task(path, form: dict) -> dict:
     """Envía un archivo a /tasks (asíncrono)."""
     async with _client(timeout=30.0) as c:
-        with open(path, "rb") as f:
+        with open(path, "rb") as f:  # noqa: ASYNC230
             r = await c.post("/tasks", files={"files": (path.name, f, _mime(path))}, data=form)
         r.raise_for_status()
         return r.json()

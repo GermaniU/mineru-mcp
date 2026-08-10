@@ -16,13 +16,13 @@ def ensure_gpu_for_mineru(backend: str) -> str | None:
     if not os.path.isfile(GPU_BROKER) or not os.access(GPU_BROKER, os.X_OK):
         # Broker no instalado — fallback: parar ComfyUI si está activo
         r = subprocess.run(["systemctl", "is-active", "comfyui.service"],
-                           capture_output=True, text=True)
+                           capture_output=True, text=True, check=False)
         if r.stdout.strip() == "active":
             subprocess.run(["systemctl", "stop", "comfyui.service"],
-                           capture_output=True, text=True)
+                           capture_output=True, text=True, check=False)
         return None
     r = subprocess.run([GPU_BROKER, "need", "mineru", GPU_NEED_VRAM],
-                       capture_output=True, text=True, timeout=120)
+                       capture_output=True, text=True, timeout=120, check=False)
     if r.returncode != 0:
         return f"GPU Broker no pudo asegurar VRAM: {r.stdout.strip()} {r.stderr.strip()}"
     return None
@@ -33,4 +33,4 @@ def release_gpu_after_mineru() -> None:
     if not os.path.isfile(GPU_BROKER) or not os.access(GPU_BROKER, os.X_OK):
         return
     subprocess.run([GPU_BROKER, "release", "mineru"],
-                   capture_output=True, text=True, timeout=60)
+                   capture_output=True, text=True, timeout=60, check=False)

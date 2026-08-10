@@ -47,7 +47,7 @@ async def parse_document(
         return "Error: timeout. El documento puede ser muy grande — usar submit_parse_task."
     except httpx.HTTPStatusError as e:
         return f"Error HTTP {e.response.status_code}: {e.response.text[:300]}"
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return f"Error: {type(e).__name__}: {e}"
     finally:
         if is_temp:
