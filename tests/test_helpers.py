@@ -2,7 +2,12 @@
 
 import pytest
 
-from mineru_mcp.helpers import build_form, extract_md, format_md_response, resolve_input_file
+from mineru_mcp.helpers import (
+    build_form,
+    extract_md,
+    format_md_response,
+    resolve_input_file,
+)
 
 
 def test_build_form_defaults():

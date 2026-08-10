@@ -38,7 +38,7 @@ async def submit_parse_task(
         if end_page is not None:
             form["end_page_id"] = str(int(end_page))
         data = await mineru_client.submit_task(path, form)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return f"Error: {type(e).__name__}: {e}"
     finally:
         if is_temp:
@@ -53,7 +53,7 @@ async def submit_parse_task(
 async def get_task_status(task_id: str) -> str:
     try:
         data = await mineru_client.task_status(task_id)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return f"Error: {type(e).__name__}: {e}"
 
     status = data.get("status", "unknown")
@@ -80,7 +80,7 @@ async def get_task_result(task_id: str) -> str:
             return (f"La tarea {task_id} aún no está completada "
                     f"(estado: {status_data.get('status', 'unknown')}).")
         data = await mineru_client.task_result(task_id)
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return f"Error: {type(e).__name__}: {e}"
 
     md = extract_md(data, task_id)

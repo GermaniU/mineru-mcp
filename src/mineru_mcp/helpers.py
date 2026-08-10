@@ -4,8 +4,13 @@ import base64
 import tempfile
 from pathlib import Path
 
-from .config import (DEFAULT_BACKEND, DEFAULT_LANG, DEFAULT_PARSE_METHOD,
-                     SUPPORTED_EXTENSIONS, SUPPORTED_LANGS)
+from .config import (
+    DEFAULT_BACKEND,
+    DEFAULT_LANG,
+    DEFAULT_PARSE_METHOD,
+    SUPPORTED_EXTENSIONS,
+    SUPPORTED_LANGS,
+)
 
 
 def build_form(backend: str, parse_method: str, effort: str, lang: str,
@@ -31,7 +36,7 @@ def build_form(backend: str, parse_method: str, effort: str, lang: str,
 
 def extract_md(data: dict, filename: str) -> str:
     if "results" in data and isinstance(data["results"], dict):
-        for _name, content in data["results"].items():
+        for content in data["results"].values():
             if isinstance(content, dict):
                 md = content.get("md_content") or content.get("md", "")
                 if md:
@@ -73,7 +78,7 @@ def resolve_input_file(file_path: str | None, file_base64: str | None,
         suffix = Path(file_name).suffix.lower()
         if suffix not in SUPPORTED_EXTENSIONS:
             raise ValueError(f"Extensión '{suffix}' no soportada. Soportadas: {', '.join(SUPPORTED_EXTENSIONS)}")
-        tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)
+        tmp = tempfile.NamedTemporaryFile(suffix=suffix, delete=False)  # noqa: SIM115
         tmp.write(base64.b64decode(file_base64))
         tmp.close()
         return Path(tmp.name), True

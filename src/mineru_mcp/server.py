@@ -3,15 +3,28 @@
 import os
 import sys
 
-from fastmcp import FastMCP
-from starlette.middleware.cors import CORSMiddleware
 import uvicorn
+from fastmcp import FastMCP
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.middleware.cors import CORSMiddleware
+from starlette.responses import JSONResponse
 
 from .tools.health import mineru_health
 from .tools.parse import parse_document
 from .tools.tasks import get_task_result, get_task_status, submit_parse_task
 
 mcp = FastMCP("mineru")
+
+
+class BearerAuthMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        token = os.getenv("MCP_AUTH_TOKEN")
+        if token:
+            header = request.headers.get("authorization", "")
+            expected = f"Bearer {token}"
+            if header != expected:
+                return JSONResponse({"error": "unauthorized"}, status_code=401)
+        return await call_next(request)
 
 
 @mcp.tool(
@@ -28,8 +41,34 @@ mcp = FastMCP("mineru")
         "preferir submit_parse_task."
     ),
 )
-async def _parse_document(**kwargs) -> str:
-    return await parse_document(**kwargs)
+async def _parse_document(
+    file_path: str | None = None,
+    file_base64: str | None = None,
+    file_name: str | None = None,
+    backend: str = "pipeline",
+    effort: str = "medium",
+    image_analysis: bool = False,
+    parse_method: str = "auto",
+    lang: str = "es",
+    formula_enable: bool = True,
+    table_enable: bool = True,
+    start_page: int | None = None,
+    end_page: int | None = None,
+) -> str:
+    return await parse_document(
+        file_path=file_path,
+        file_base64=file_base64,
+        file_name=file_name,
+        backend=backend,
+        effort=effort,
+        image_analysis=image_analysis,
+        parse_method=parse_method,
+        lang=lang,
+        formula_enable=formula_enable,
+        table_enable=table_enable,
+        start_page=start_page,
+        end_page=end_page,
+    )
 
 
 @mcp.tool(
@@ -41,8 +80,34 @@ async def _parse_document(**kwargs) -> str:
         "y get_task_result."
     ),
 )
-async def _submit_parse_task(**kwargs) -> str:
-    return await submit_parse_task(**kwargs)
+async def _submit_parse_task(
+    file_path: str | None = None,
+    file_base64: str | None = None,
+    file_name: str | None = None,
+    backend: str = "pipeline",
+    effort: str = "medium",
+    image_analysis: bool = False,
+    parse_method: str = "auto",
+    lang: str = "es",
+    formula_enable: bool = True,
+    table_enable: bool = True,
+    start_page: int | None = None,
+    end_page: int | None = None,
+) -> str:
+    return await submit_parse_task(
+        file_path=file_path,
+        file_base64=file_base64,
+        file_name=file_name,
+        backend=backend,
+        effort=effort,
+        image_analysis=image_analysis,
+        parse_method=parse_method,
+        lang=lang,
+        formula_enable=formula_enable,
+        table_enable=table_enable,
+        start_page=start_page,
+        end_page=end_page,
+    )
 
 
 @mcp.tool(
@@ -78,6 +143,7 @@ def main():
         mcp.run(transport="stdio")
     else:
         app = mcp.http_app(stateless_http=True)
+        app.add_middleware(BearerAuthMiddleware)
         app.add_middleware(
             CORSMiddleware,
             allow_origins=["*"],

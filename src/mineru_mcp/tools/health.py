@@ -7,7 +7,7 @@ from ..config import MINERU_IS_EXTERNAL, MINERU_URL
 async def mineru_health() -> str:
     try:
         data = await mineru_client.health()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         return f"Error: no se puede contactar MinerU en {MINERU_URL}: {type(e).__name__}: {e}"
 
     status = data.get("status", "unknown")
