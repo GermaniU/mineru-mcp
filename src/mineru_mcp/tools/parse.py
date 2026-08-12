@@ -30,7 +30,7 @@ async def parse_document(
         return (f"BLOQUEADO por seguridad: MINERU_URL apunta a {MINERU_URL} (servidor externo). "
                 "Configurar MINERU_URL a localhost:8000 o una URL interna.")
 
-    gpu_err = gpu_arbiter.ensure_gpu_for_mineru(backend)
+    gpu_err, gpu_client_id = gpu_arbiter.ensure_gpu_for_mineru(backend)
     if gpu_err:
         return f"Error liberando GPU: {gpu_err}"
 
@@ -52,7 +52,7 @@ async def parse_document(
     finally:
         if is_temp:
             path.unlink(missing_ok=True)
-        gpu_arbiter.release_gpu_after_mineru()
+        gpu_arbiter.release_gpu_after_mineru(gpu_client_id)
 
     md = extract_md(data, path.name)
     if not md.strip():
