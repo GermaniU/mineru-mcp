@@ -13,6 +13,12 @@ MINERU_IS_EXTERNAL = not any(MINERU_URL.startswith(p) for p in _LOCAL_PREFIXES)
 PARSE_TIMEOUT = 300.0
 DEFAULT_TIMEOUT = 15.0
 
+# mineru-api corre bajo demanda: el idle-watchdog lo apaga para devolver VRAM,
+# igual que xtts/comfyui. El MCP lo despierta antes de parsear.
+MINERU_SERVICE = os.getenv("MINERU_SERVICE", "mineru-api.service")
+WAKE_TIMEOUT_S = 90.0
+WAKE_POLL_S = 2.0
+
 SUPPORTED_EXTENSIONS = {".pdf", ".docx", ".pptx", ".xlsx", ".png", ".jpg", ".jpeg"}
 
 # Backends que usan VRAM — coordinan con el GPU Broker antes de parsear.

@@ -30,6 +30,10 @@ async def parse_document(
         return (f"BLOQUEADO por seguridad: MINERU_URL apunta a {MINERU_URL} (servidor externo). "
                 "Configurar MINERU_URL a localhost:8000 o una URL interna.")
 
+    wake_err = await mineru_client.ensure_running()
+    if wake_err:
+        return f"Error: {wake_err}"
+
     gpu_err, gpu_client_id = gpu_arbiter.ensure_gpu_for_mineru(backend)
     if gpu_err:
         return f"Error liberando GPU: {gpu_err}"
