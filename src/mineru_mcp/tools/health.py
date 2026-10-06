@@ -1,7 +1,5 @@
 """Tool mineru_health: verifica que MinerU esté disponible."""
 
-import subprocess
-
 from .. import mineru_client
 from ..config import MINERU_IS_EXTERNAL, MINERU_SERVICE, MINERU_URL
 
@@ -13,10 +11,9 @@ async def mineru_health() -> str:
         # El backend se apaga solo por idle para devolver VRAM. No hay que
         # confundir "dormido" con "roto": el health no arranca nada, pero sí
         # dice cuál de los dos es.
-        r = subprocess.run(["systemctl", "is-active", MINERU_SERVICE],
-                           capture_output=True, text=True, check=False)
-        if r.stdout.strip() != "active":
-            return (f"MinerU no disponible ({MINERU_SERVICE} inactivo). "
+        _, estado = await mineru_client._systemctl("is-active", MINERU_SERVICE)
+        if estado != "active":
+            return ("MinerU no disponible (el backend está inactivo). "
                     "Usar parse_document o submit_parse_task para arrancarlo.")
         return f"Error: no se puede contactar MinerU en {MINERU_URL}: {type(e).__name__}: {e}"
 

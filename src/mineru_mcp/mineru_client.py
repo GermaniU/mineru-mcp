@@ -1,7 +1,6 @@
 """HTTP client thin a mineru-api: file_parse, tasks, health."""
 
 import asyncio
-import subprocess
 import time
 
 import httpx
@@ -29,8 +28,18 @@ async def _reachable() -> bool:
         return False
 
 
+async def _systemctl(*args: str) -> tuple[int, str]:
+    """Corre systemctl sin bloquear el event loop. Devuelve (returncode, stdout)."""
+    proc = await asyncio.create_subprocess_exec(
+        "systemctl", *args,
+        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+    )
+    out, _ = await proc.communicate()
+    return proc.returncode, out.decode().strip()
+
+
 async def ensure_running() -> str | None:
-    """Arranca mineru-api.service si no responde y espera a que cargue.
+    """Arranca el service de MinerU si no responde y espera a que cargue.
 
     El idle-watchdog apaga el backend para devolver VRAM, así que en frío
     la primera llamada tiene que despertarlo — mismo patrón que xtts_mcp y
@@ -38,13 +47,13 @@ async def ensure_running() -> str | None:
     """
     if await _reachable():
         return None
-    subprocess.run(["systemctl", "start", MINERU_SERVICE], capture_output=True, text=True)
+    await _systemctl("start", MINERU_SERVICE)
     deadline = time.time() + WAKE_TIMEOUT_S
     while time.time() < deadline:
         if await _reachable():
             return None
         await asyncio.sleep(WAKE_POLL_S)
-    return f"{MINERU_SERVICE} no respondió tras {WAKE_TIMEOUT_S:.0f}s de arrancarlo."
+    return f"MinerU no respondió tras {WAKE_TIMEOUT_S:.0f}s de arrancarlo."
 
 
 async def file_parse(path, form: dict, timeout: float = PARSE_TIMEOUT) -> dict:
