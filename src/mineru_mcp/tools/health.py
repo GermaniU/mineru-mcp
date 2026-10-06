@@ -1,13 +1,20 @@
 """Tool mineru_health: verifica que MinerU esté disponible."""
 
 from .. import mineru_client
-from ..config import MINERU_IS_EXTERNAL, MINERU_URL
+from ..config import MINERU_IS_EXTERNAL, MINERU_SERVICE, MINERU_URL
 
 
 async def mineru_health() -> str:
     try:
         data = await mineru_client.health()
     except Exception as e:  # noqa: BLE001
+        # El backend se apaga solo por idle para devolver VRAM. No hay que
+        # confundir "dormido" con "roto": el health no arranca nada, pero sí
+        # dice cuál de los dos es.
+        _, estado = await mineru_client._systemctl("is-active", MINERU_SERVICE)
+        if estado != "active":
+            return ("MinerU no disponible (el backend está inactivo). "
+                    "Usar parse_document o submit_parse_task para arrancarlo.")
         return f"Error: no se puede contactar MinerU en {MINERU_URL}: {type(e).__name__}: {e}"
 
     status = data.get("status", "unknown")
