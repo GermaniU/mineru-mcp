@@ -99,6 +99,7 @@ Create a `.env` file or export environment variables:
 | `MINERU_BACKEND` | `pipeline` | Backend when a call leaves it empty (`pipeline`, `hybrid-engine`, `vlm-engine`). |
 | `MINERU_PARSE_METHOD` | `auto` | Extraction method when a call leaves it empty (`auto`, `txt`, `ocr`). |
 | `MINERU_LANG` | `es` | OCR language when a call leaves it empty. |
+| `MINERU_SYSTEMCTL_SCOPE` | `user` | Where the `mineru-api` unit lives, used to wake it and check its state: `user` (`systemctl --user`) or `system` (`/etc/systemd/system`). Any other value stops the server from starting. |
 | `MCP_HOST` | `0.0.0.0` | Host binding for HTTP mode. |
 | `MCP_PORT` | `8202` | Port for HTTP mode. |
 | `MCP_AUTH_TOKEN` | *(empty = no auth)* | If set, HTTP mode requires `Authorization: Bearer <token>` on every request. |
@@ -130,7 +131,7 @@ MinerU MCP is deliberately thin. It does **one thing**: carry documents from an 
 - ✅ PDF, DOCX, PPTX, XLSX, PNG and JPG to Markdown with headings, tables (HTML) and formulas (LaTeX).
 - ✅ Takes the document as a server path (`file_path`) or as content (`file_base64` + `file_name`) from another machine.
 - ✅ Synchronous parsing for short documents and asynchronous with a `task_id` for long ones, with page ranges.
-- ✅ If `mineru-api` is stopped and systemd is available, starts it (`systemctl start`) and waits for it to answer before parsing.
+- ✅ If `mineru-api` is stopped and systemd is available, starts it (`systemctl --user start`, or without `--user` with `MINERU_SYSTEMCTL_SCOPE=system`) and waits for it to answer before parsing.
 - ✅ Requests and releases VRAM through the GPU Broker when the host has one.
 
 ### What it does NOT do (yet)

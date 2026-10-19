@@ -8,6 +8,7 @@ import httpx
 from .config import (
     DEFAULT_TIMEOUT,
     MINERU_SERVICE,
+    MINERU_SYSTEMCTL_SCOPE,
     MINERU_URL,
     PARSE_TIMEOUT,
     WAKE_POLL_S,
@@ -29,14 +30,19 @@ async def _reachable() -> bool:
 
 
 async def _systemctl(*args: str) -> tuple[int, str]:
-    """Corre systemctl sin bloquear el event loop. Devuelve (returncode, stdout).
+    """Corre systemctl sobre la unit de mineru-api sin bloquear el event loop.
+    Devuelve (returncode, stdout). Agrega --user si MINERU_SYSTEMCTL_SCOPE=user.
 
     Sin systemd (contenedor Docker, macOS) devuelve 127, como el shell.
     """
+    scope = ("--user",) if MINERU_SYSTEMCTL_SCOPE == "user" else ()
     try:
         proc = await asyncio.create_subprocess_exec(
-            "systemctl", *args,
-            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+            "systemctl",
+            *scope,
+            *args,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
         )
     except FileNotFoundError:
         return 127, ""

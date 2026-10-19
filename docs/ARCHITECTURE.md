@@ -63,7 +63,7 @@
   - `POST /file_parse` — Parseo síncrono (`parse_document`).
   - `POST /tasks` — Encola una tarea asíncrona (`submit_parse_task`).
   - `GET /tasks/{task_id}` y `GET /tasks/{task_id}/result` — Estado y Markdown de la tarea.
-- Si `mineru-api` no responde y hay systemd, lo arranca (`systemctl start`) y espera hasta 90 s antes de parsear.
+- Si `mineru-api` no responde y hay systemd, lo arranca (`systemctl --user start`, o `systemctl start` con `MINERU_SYSTEMCTL_SCOPE=system`) y espera hasta 90 s antes de parsear.
 
 ### 3. Helpers de Procesamiento de Entrada (`src/mineru_mcp/helpers.py`)
 - Procesa de forma transparente las dos modalidades de entrada de documentos:

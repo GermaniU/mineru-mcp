@@ -16,6 +16,14 @@ DEFAULT_TIMEOUT = 15.0
 # mineru-api corre bajo demanda: el idle-watchdog lo apaga para devolver VRAM,
 # igual que xtts/comfyui. El MCP lo despierta antes de parsear.
 MINERU_SERVICE = os.getenv("MINERU_SERVICE", "mineru-api.service")
+# "user": la unit vive en ~/.config/systemd/user y se maneja con systemctl --user
+# (el MCP tiene que correr en la sesión systemd de ese mismo usuario).
+# "system": unit en /etc/systemd/system, systemctl sin --user.
+MINERU_SYSTEMCTL_SCOPE = (os.getenv("MINERU_SYSTEMCTL_SCOPE") or "user").strip().lower()
+if MINERU_SYSTEMCTL_SCOPE not in ("user", "system"):
+    raise ValueError(
+        f"MINERU_SYSTEMCTL_SCOPE={MINERU_SYSTEMCTL_SCOPE!r} no es válido: usa 'user' o 'system'."
+    )
 WAKE_TIMEOUT_S = 90.0
 WAKE_POLL_S = 2.0
 
