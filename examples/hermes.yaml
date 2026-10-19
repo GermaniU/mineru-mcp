@@ -1,0 +1,4 @@
+mcp_servers:
+  mineru:
+    url: "http://localhost:8202/mcp"
+    transport: "http"

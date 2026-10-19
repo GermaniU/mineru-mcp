@@ -49,3 +49,18 @@ def test_auth_enabled_authorized(auth_app, monkeypatch):
     res = client.get("/test", headers={"Authorization": "Bearer secret123"})
     assert res.status_code == 200
     assert res.text == "OK"
+
+
+async def test_server_info_reporta_version_del_paquete():
+    from importlib.metadata import version
+
+    from fastmcp import Client
+
+    from mineru_mcp.server import mcp
+
+    async with Client(mcp) as client:
+        # FastMCP 4 negocia server/discover y ya no deja InitializeResult.
+        result = client.initialize_result
+        info = result.serverInfo if result else client.server_info
+    assert info.name == "mineru"
+    assert info.version == version("mineru-mcp")
