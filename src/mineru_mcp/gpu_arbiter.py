@@ -11,6 +11,7 @@ la GPU.
 """
 
 import os
+import shutil
 import subprocess
 import uuid
 
@@ -28,7 +29,10 @@ def ensure_gpu_for_mineru(backend: str) -> tuple[str | None, str | None]:
     client_id = uuid.uuid4().hex[:12]
 
     if not os.path.isfile(GPU_BROKER) or not os.access(GPU_BROKER, os.X_OK):
-        # Broker no instalado — fallback: parar ComfyUI si está activo
+        # Broker no instalado — fallback: parar ComfyUI si está activo.
+        # Sin systemd (contenedor Docker) no hay nada que parar.
+        if shutil.which("systemctl") is None:
+            return None, None
         r = subprocess.run(["systemctl", "is-active", "comfyui.service"],
                            capture_output=True, text=True, check=False)
         if r.stdout.strip() == "active":

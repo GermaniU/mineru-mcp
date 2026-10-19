@@ -11,8 +11,8 @@ async def mineru_health() -> str:
         # El backend se apaga solo por idle para devolver VRAM. No hay que
         # confundir "dormido" con "roto": el health no arranca nada, pero sí
         # dice cuál de los dos es.
-        _, estado = await mineru_client._systemctl("is-active", MINERU_SERVICE)
-        if estado != "active":
+        rc, estado = await mineru_client._systemctl("is-active", MINERU_SERVICE)
+        if rc != 127 and estado != "active":
             return ("MinerU no disponible (el backend está inactivo). "
                     "Usar parse_document o submit_parse_task para arrancarlo.")
         return f"Error: no se puede contactar MinerU en {MINERU_URL}: {type(e).__name__}: {e}"

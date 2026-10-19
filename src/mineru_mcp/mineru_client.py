@@ -29,11 +29,17 @@ async def _reachable() -> bool:
 
 
 async def _systemctl(*args: str) -> tuple[int, str]:
-    """Corre systemctl sin bloquear el event loop. Devuelve (returncode, stdout)."""
-    proc = await asyncio.create_subprocess_exec(
-        "systemctl", *args,
-        stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
-    )
+    """Corre systemctl sin bloquear el event loop. Devuelve (returncode, stdout).
+
+    Sin systemd (contenedor Docker, macOS) devuelve 127, como el shell.
+    """
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "systemctl", *args,
+            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL,
+        )
+    except FileNotFoundError:
+        return 127, ""
     out, _ = await proc.communicate()
     return proc.returncode, out.decode().strip()
 
@@ -47,7 +53,9 @@ async def ensure_running() -> str | None:
     """
     if await _reachable():
         return None
-    await _systemctl("start", MINERU_SERVICE)
+    rc, _ = await _systemctl("start", MINERU_SERVICE)
+    if rc == 127:
+        return f"MinerU no responde en {MINERU_URL} y aquí no hay systemd para arrancarlo."
     deadline = time.time() + WAKE_TIMEOUT_S
     while time.time() < deadline:
         if await _reachable():
