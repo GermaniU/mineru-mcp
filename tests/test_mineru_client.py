@@ -1,8 +1,10 @@
 """Tests del wake-on-demand de mineru-api."""
 
+import importlib
+
 import pytest
 
-from mineru_mcp import mineru_client
+from mineru_mcp import config, mineru_client
 from mineru_mcp.tools import health
 
 
@@ -92,6 +94,81 @@ async def test_health_sin_systemd_reporta_la_url(monkeypatch):
 
     msg = await health.mineru_health()
     assert msg.startswith("Error: no se puede contactar MinerU")
+
+
+@pytest.mark.asyncio
+async def test_systemctl_scope_user_agrega_flag(monkeypatch):
+    """Default: mineru-api es unit de usuario, así que va con --user."""
+    calls = _exec_fake(monkeypatch)
+    monkeypatch.setattr(mineru_client, "MINERU_SYSTEMCTL_SCOPE", "user")
+
+    rc, out = await mineru_client._systemctl("start", "mineru-api.service")
+    assert (rc, out) == (0, "active")
+    assert calls == [("systemctl", "--user", "start", "mineru-api.service")]
+
+
+@pytest.mark.asyncio
+async def test_systemctl_scope_system_sin_flag(monkeypatch):
+    """Con scope system se llama como antes, sin --user."""
+    calls = _exec_fake(monkeypatch)
+    monkeypatch.setattr(mineru_client, "MINERU_SYSTEMCTL_SCOPE", "system")
+
+    await mineru_client._systemctl("is-active", "mineru-api.service")
+    assert calls == [("systemctl", "is-active", "mineru-api.service")]
+
+
+@pytest.mark.asyncio
+async def test_health_consulta_el_scope_configurado(monkeypatch):
+    """El health pregunta is-active en el mismo scope que el wake."""
+    calls = _exec_fake(monkeypatch, stdout=b"inactive\n", rc=3)
+    monkeypatch.setattr(mineru_client, "MINERU_SYSTEMCTL_SCOPE", "user")
+    monkeypatch.setattr(mineru_client, "health", _caido)
+
+    assert "inactivo" in await health.mineru_health()
+    assert calls == [("systemctl", "--user", "is-active", "mineru-api.service")]
+
+
+async def _caido():
+    raise ConnectionError("down")
+
+
+@pytest.mark.parametrize("valor", ["usr", "global", "--user"])
+def test_scope_invalido_falla_al_arrancar(monkeypatch, valor):
+    """Un scope mal escrito no debe caer en silencio a uno de los dos modos."""
+    monkeypatch.setenv("MINERU_SYSTEMCTL_SCOPE", valor)
+    try:
+        with pytest.raises(ValueError, match="MINERU_SYSTEMCTL_SCOPE"):
+            importlib.reload(config)
+    finally:
+        monkeypatch.delenv("MINERU_SYSTEMCTL_SCOPE")
+        importlib.reload(config)
+
+
+@pytest.mark.parametrize(("valor", "esperado"), [(" System ", "system"), ("", "user")])
+def test_scope_normaliza_y_vacio_es_user(monkeypatch, valor, esperado):
+    monkeypatch.setenv("MINERU_SYSTEMCTL_SCOPE", valor)
+    try:
+        assert importlib.reload(config).MINERU_SYSTEMCTL_SCOPE == esperado
+    finally:
+        monkeypatch.delenv("MINERU_SYSTEMCTL_SCOPE")
+        importlib.reload(config)
+
+
+def _exec_fake(monkeypatch, stdout=b"active\n", rc=0):
+    calls = []
+
+    class _Proc:
+        returncode = rc
+
+        async def communicate(self):
+            return stdout, b""
+
+    async def _fn(*args, **kwargs):
+        calls.append(args)
+        return _Proc()
+
+    monkeypatch.setattr(mineru_client.asyncio, "create_subprocess_exec", _fn)
+    return calls
 
 
 def _systemctl_fake(calls, stdout="", rc=0):

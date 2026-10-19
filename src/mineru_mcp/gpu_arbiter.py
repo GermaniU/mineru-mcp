@@ -31,6 +31,7 @@ def ensure_gpu_for_mineru(backend: str) -> tuple[str | None, str | None]:
     if not os.path.isfile(GPU_BROKER) or not os.access(GPU_BROKER, os.X_OK):
         # Broker no instalado — fallback: parar ComfyUI si está activo.
         # Sin systemd (contenedor Docker) no hay nada que parar.
+        # comfyui.service es unit de sistema: no sigue MINERU_SYSTEMCTL_SCOPE.
         if shutil.which("systemctl") is None:
             return None, None
         r = subprocess.run(["systemctl", "is-active", "comfyui.service"],
