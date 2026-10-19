@@ -58,10 +58,46 @@ async def test_health_inactivo_no_nombra_el_servicio(monkeypatch):
     assert "mineru-api.service" not in msg
 
 
-def _systemctl_fake(calls, stdout=""):
+@pytest.mark.asyncio
+async def test_systemctl_sin_systemd_devuelve_127(monkeypatch):
+    """En un contenedor no existe systemctl: no debe reventar la tool."""
+    async def _sin_binario(*args, **kwargs):
+        raise FileNotFoundError("systemctl")
+
+    monkeypatch.setattr(mineru_client.asyncio, "create_subprocess_exec", _sin_binario)
+
+    assert await mineru_client._systemctl("is-active", "x") == (127, "")
+
+
+@pytest.mark.asyncio
+async def test_ensure_running_sin_systemd_no_espera(monkeypatch):
+    """Sin systemd no hay nada que arrancar: error inmediato en vez de 90s de polling."""
+    monkeypatch.setattr(mineru_client, "_reachable", _async_return(False))
+    monkeypatch.setattr(mineru_client, "_systemctl", _systemctl_fake([], rc=127))
+    monkeypatch.setattr(mineru_client, "WAKE_TIMEOUT_S", 60)
+
+    err = await mineru_client.ensure_running()
+    assert "no hay systemd" in err
+    assert mineru_client.MINERU_URL in err
+
+
+@pytest.mark.asyncio
+async def test_health_sin_systemd_reporta_la_url(monkeypatch):
+    """En Docker el backend no está "dormido": simplemente no se alcanza."""
+    async def _caido():
+        raise ConnectionError("down")
+
+    monkeypatch.setattr(mineru_client, "health", _caido)
+    monkeypatch.setattr(mineru_client, "_systemctl", _systemctl_fake([], rc=127))
+
+    msg = await health.mineru_health()
+    assert msg.startswith("Error: no se puede contactar MinerU")
+
+
+def _systemctl_fake(calls, stdout="", rc=0):
     async def _fn(*args):
         calls.append(args)
-        return 0, stdout
+        return rc, stdout
     return _fn
 
 

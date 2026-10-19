@@ -1,0 +1,10 @@
+.git
+.github
+.venv
+tests
+docs
+scripts
+*.md
+!README.md
+.env
+uv.lock

@@ -50,7 +50,7 @@ Extraer texto estructurado, tablas complejas y fórmulas matemáticas de archivo
  |        (FastMCP + File Path / Base64 Decoder)         |
  +-------------------------------------------------------+
                              |
-                             | Loopback HTTP (Puerto 8002)
+                             | Loopback HTTP (Puerto 8000)
                              v
  +-------------------------------------------------------+
  |                  MinerU Backend Host                  |
@@ -78,6 +78,28 @@ source .venv/bin/activate
 uv pip install -e .
 ```
 
+### Con Docker (stdio, sin clonar)
+
+La imagen `ghcr.io/germaniu/mineru-mcp` habla MCP por stdio y llama a un `mineru-api` que corre en el host. Configúrala en tu cliente MCP:
+
+```json
+{
+  "mcpServers": {
+    "mineru": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "--add-host", "host.docker.internal:host-gateway",
+        "-e", "MINERU_URL=http://host.docker.internal:8000",
+        "ghcr.io/germaniu/mineru-mcp:latest", "--stdio"
+      ]
+    }
+  }
+}
+```
+
+Dentro del contenedor `file_path` se refiere al sistema de archivos del contenedor: manda los documentos con `file_base64` + `file_name`, o monta un directorio con `-v`. Sin systemd en el contenedor no hay wake-on-demand ni GPU Broker: `mineru-api` tiene que estar ya arriba.
+
 ---
 
 ## ⚙️ Configuración (Variables de Entorno)
@@ -86,35 +108,50 @@ Crea un archivo `.env` o exporta las siguientes variables:
 
 | Variable | Valor por Defecto | Descripción |
 |----------|-------------------|-------------|
-| `MINERU_API_URL` | `http://127.0.0.1:8002` | URL loopback donde escucha `mineru-api`. |
-| `MCP_HOST` | `0.0.0.0` | Host binding para el servidor MCP. |
-| `MCP_PORT` | `8202` | Puerto HTTP/SSE del servidor MCP. |
-| `MCP_AUTH_TOKEN` | *(vacío = sin auth)* | Si se define, exige header `Authorization: Bearer <token>` en cada request HTTP/SSE. |
-| `UPLOAD_DIR` | `/tmp/mineru_uploads` | Directorio temporal para decodificar PDFs Base64. |
+| `MINERU_URL` | `http://127.0.0.1:8000` | URL de `mineru-api`. Solo se aceptan loopback y `host.docker.internal`; con cualquier otro host las tools se niegan a enviar documentos. |
+| `MINERU_BACKEND` | `pipeline` | Backend si la llamada lo deja vacío (`pipeline`, `hybrid-engine`, `vlm-engine`). |
+| `MINERU_PARSE_METHOD` | `auto` | Método de extracción si la llamada lo deja vacío (`auto`, `txt`, `ocr`). |
+| `MINERU_LANG` | `es` | Idioma OCR si la llamada lo deja vacío. |
+| `MCP_HOST` | `0.0.0.0` | Host binding del modo HTTP. |
+| `MCP_PORT` | `8202` | Puerto del modo HTTP. |
+| `MCP_AUTH_TOKEN` | *(vacío = sin auth)* | Si se define, el modo HTTP exige `Authorization: Bearer <token>` en cada request. |
+| `MCP_TRANSPORT` | *(vacío = HTTP)* | `stdio` equivale a pasar `--stdio`. |
+
+Qué protege y qué no cada ajuste: [SECURITY.md](SECURITY.md).
 
 ---
 
 ## 🛠️ Herramientas Expuestas (Tool Reference)
 
-### 1. `parse_pdf`
-Extrae el contenido de un archivo PDF devolviendo Markdown estructurado, código LaTeX de fórmulas e imágenes.
+| Tool | Qué hace |
+|------|----------|
+| `parse_document` | Parseo síncrono (30-120 s) de PDF, DOCX, PPTX, XLSX o imagen a Markdown. Entrada: `file_path` (ruta en el server) o `file_base64` + `file_name`. Opcionales: `backend`, `effort`, `image_analysis`, `parse_method`, `lang`, `formula_enable`, `table_enable`, `start_page`, `end_page`. |
+| `submit_parse_task` | Igual que `parse_document` pero asíncrono: devuelve un `task_id`. Para documentos de más de ~50 páginas. |
+| `get_task_status` | Estado de una tarea (`pending` / `processing` / `completed` / `failed`). |
+| `get_task_result` | Markdown de una tarea ya completada. |
+| `mineru_health` | Disponibilidad de `mineru-api`, versión y tareas en cola. |
 
-- **Parámetros**:
-  - `file_path` (*string*, opcional): Ruta absoluta al archivo PDF en el sistema de archivos host.
-  - `file_base64` (*string*, opcional): Contenido del archivo PDF codificado en Base64 (para clientes remotos).
-  - `file_name` (*string*, opcional): Nombre original del archivo cuando se usa `file_base64`.
-  - `backend` (*string*, opcional): Motor de extracción (`pipeline` para CPU, `hybrid-engine` o `vlm-engine` para GPU). Default: `"pipeline"`.
-  - `is_ocr` (*boolean*, opcional): Forzar procesamiento OCR. Default: `false`.
-  - `data_id` (*string*, opcional): Identificador opcional del documento.
+`hybrid-engine` + `effort=high` + `image_analysis=true` convierte figuras en diagramas Mermaid.
 
-### 2. `get_task_status`
-Consulta el estado de procesamiento de una tarea asíncrona de extracción pasando su `task_id`.
+---
 
-### 3. `list_tasks`
-Lista las tareas de extracción de documentos recientes y su estado actual.
+## 🧭 ¿Y los otros servidores MCP para documentos?
 
-### 4. `mineru_health`
-Obtiene el estado de salud del backend: disponibilidad de `mineru-api` y uso de recursos.
+Hay tres familias, y resuelven problemas distintos.
+
+| | **MinerU MCP** (este) | MCP oficial de MinerU (cloud) | Conversores generales (Docling, MarkItDown) |
+|---|---|---|---|
+| Dónde se parsea | Tu `mineru-api`, en tu hardware | La API cloud de MinerU | La máquina donde corre el MCP |
+| Tus documentos salen de tu red | **No** (bloquea URLs externas) | Sí | No |
+| Cuenta / token | Ninguno | Token de la API de MinerU | Ninguno |
+| Dependencias en el cliente | Ninguna (HTTP) o solo Docker (stdio) | Python (`uvx mineru-open-mcp`) | El motor de conversión completo |
+| Comparte la GPU con un LLM local | **Sí** (GPU Broker) | N/A | No |
+| Motor | MinerU (`pipeline` / `vlm` / `hybrid`) | MinerU | El suyo propio |
+
+**En una frase:**
+- Si no tienes GPU ni servidor y no te importa subir los documentos → el MCP cloud oficial de MinerU.
+- Si quieres un conversor que viva en la misma máquina que el cliente → Docling o MarkItDown.
+- Si ya tienes (o quieres) MinerU en tu propio servidor y que **los documentos no salgan de tu red**, compartido por todos los clientes de la LAN → este.
 
 ---
 
