@@ -37,7 +37,9 @@
 
 ## ⚡ Step 2: Systemd Services
 
-### 1. Service MinerU API Backend (`/etc/systemd/system/mineru-api.service`)
+Por defecto el MCP maneja `mineru-api` como **unit de usuario** (`systemctl --user`): el wake-on-demand la arranca y `mineru_health` consulta su estado sin sudo ni polkit. Para eso las dos units tienen que vivir en la sesión systemd del mismo usuario. Si prefieres units de sistema, ve a [Modo system](#modo-system-mineru_systemctl_scopesystem).
+
+### 1. Service MinerU API Backend (`~/.config/systemd/user/mineru-api.service`)
 
 ```ini
 [Unit]
@@ -46,55 +48,70 @@ After=network.target
 
 [Service]
 Type=simple
-User=<YOUR_USER>
-WorkingDirectory=<HOME>/stack/mineru-api
-Environment="PATH=<HOME>/stack/mineru-api/.venv/bin:/usr/bin"
-ExecStart=<HOME>/stack/mineru-api/.venv/bin/mineru-api --host 127.0.0.1 --port 8002
-Restart=always
+WorkingDirectory=%h/stack/mineru-api
+Environment="PATH=%h/stack/mineru-api/.venv/bin:/usr/bin"
+ExecStart=%h/stack/mineru-api/.venv/bin/mineru-api --host 127.0.0.1 --port 8000
+Restart=on-failure
 RestartSec=5
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target
 ```
 
-### 2. Service MinerU MCP Server (`/etc/systemd/system/mineru-mcp.service`)
+No hace falta habilitarla: el MCP la arranca cuando llega un documento y un idle-watchdog puede apagarla para devolver la VRAM.
+
+### 2. Service MinerU MCP Server (`~/.config/systemd/user/mineru-mcp.service`)
 
 ```ini
 [Unit]
 Description=MinerU MCP Server (FastMCP HTTP)
-After=network.target mineru-api.service
+After=network.target
 
 [Service]
 Type=simple
-User=<YOUR_USER>
-WorkingDirectory=<HOME>/Sites/mineru-mcp
-Environment="PATH=<HOME>/Sites/mineru-mcp/.venv/bin:/usr/bin"
-Environment="MINERU_API_URL=http://127.0.0.1:8002"
+WorkingDirectory=%h/Sites/mineru-mcp
+Environment="MINERU_URL=http://127.0.0.1:8000"
 Environment="MCP_PORT=8202"
 Environment="MCP_HOST=0.0.0.0"
-ExecStart=<HOME>/Sites/mineru-mcp/.venv/bin/python -m mineru_mcp.server
-Restart=always
+ExecStart=%h/Sites/mineru-mcp/.venv/bin/mineru-mcp
+Restart=on-failure
 RestartSec=3
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target
 ```
+
+```bash
+systemctl --user daemon-reload
+systemctl --user enable --now mineru-mcp.service
+# Sin linger, las units de usuario mueren al cerrar sesión y no arrancan al boot:
+sudo loginctl enable-linger "$USER"
+```
+
+### Modo system (`MINERU_SYSTEMCTL_SCOPE=system`)
+
+Si `mineru-api` es unit de sistema (`/etc/systemd/system/mineru-api.service`, con `User=<YOUR_USER>` y `WantedBy=multi-user.target`), agrega `Environment="MINERU_SYSTEMCTL_SCOPE=system"` al service del MCP. El MCP llama `systemctl start` / `is-active` **sin sudo**, así que el usuario del MCP necesita permiso de polkit para manejar esa unit:
+
+```js
+// /etc/polkit-1/rules.d/50-mineru-api.rules
+polkit.addRule(function (action, subject) {
+  if (action.id == "org.freedesktop.systemd1.manage-units" &&
+      action.lookup("unit") == "mineru-api.service" &&
+      subject.user == "<YOUR_USER>") {
+    return polkit.Result.YES;
+  }
+});
+```
+
+No dejes la misma unit instalada en los dos scopes: el MCP solo mira el que configuraste y el otro puede quedarse con el puerto. Cualquier valor distinto de `user` o `system` hace que el MCP no arranque.
 
 ---
 
-## ⚡ Step 3: Configuración del GPU Broker & Arbiter (Opcional VLM)
+## ⚡ Step 3: GPU Broker (opcional)
 
-Si se utiliza el backend `hybrid-engine` o `vlm-engine` que consume VRAM (~4GB), la máquina host debe contar con la regla de sudoers para conmutación de servicios:
+Si el host tiene el GPU Broker (`~/stack/gpu-broker/gpu-broker.sh`), cada parseo le pide la VRAM antes y la devuelve al terminar: ~1.5 GB para `pipeline` y ~4 GB para `hybrid-engine` / `vlm-engine`.
 
-```ini
-# /etc/sudoers.d/gpu-arbiter
-# Permisos limitados para el arbitraje de GPU
-<YOUR_USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl start mineru-api.service
-<YOUR_USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop mineru-api.service
-<YOUR_USER> ALL=(ALL) NOPASSWD: /usr/bin/systemctl is-active mineru-api.service
-```
-
-> **Importante**: El archivo `/etc/sudoers.d/gpu-arbiter` debe tener permisos `0440` (`sudo chmod 0440 /etc/sudoers.d/gpu-arbiter`).
+Sin broker, el fallback detiene `comfyui.service` si está activo. Esa unit es de sistema, así que el fallback usa `systemctl` sin `--user` sin importar `MINERU_SYSTEMCTL_SCOPE`, y el usuario del MCP necesita el mismo tipo de regla de polkit para `comfyui.service`.
 
 ---
 

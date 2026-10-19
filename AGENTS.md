@@ -48,7 +48,7 @@ tests/                 # pytest por módulo
 
 | Backend | Cuándo | Notas |
 |---|---|---|
-| `pipeline` | Default, rápido, sin GPU | No compite por VRAM |
+| `pipeline` | Default, rápido | Usa ~1.1GB de VRAM (reserva 1.5GB en el GPU Broker) |
 | `vlm-engine` | Máxima precisión por página | ~4GB VRAM |
 | `hybrid-engine` | Mejor balance | Con `effort=high` + `image_analysis=true` da diagramas Mermaid |
 
@@ -60,6 +60,7 @@ tests/                 # pytest por módulo
 | `MINERU_BACKEND` | `pipeline` | Backend default |
 | `MINERU_PARSE_METHOD` | `auto` | Método de extracción |
 | `MINERU_LANG` | `es` | Idioma OCR |
+| `MINERU_SYSTEMCTL_SCOPE` | `user` | Scope de la unit mineru-api: `user` (`systemctl --user`) o `system` |
 | `MCP_PORT` | `8202` | Puerto del MCP server |
 | `MCP_HOST` | `0.0.0.0` | Host binding |
 
@@ -70,7 +71,7 @@ tests/                 # pytest por módulo
 
 ## Deploy
 
-- systemd: `mineru-mcp.service` (puerto 8202)
+- systemd: `mineru-mcp.service` (puerto 8202), unit de usuario igual que `mineru-api.service`
 - El servicio corre desde el repo (`~/Sites/mineru-mcp/.venv`), WorkingDirectory = repo.
 - GPU Broker en `ExecStartPre` del service para el switch de GPU.
 

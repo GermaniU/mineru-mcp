@@ -8,6 +8,7 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 ## [Sin publicar]
 
 ### Añadido
+- `MINERU_SYSTEMCTL_SCOPE` (`user` por defecto, o `system`): scope de systemd de la unit `mineru-api` para el wake-on-demand y `mineru_health`. Un valor inválido impide arrancar el server con un error que nombra la variable.
 - **Demo grabada contra un `mineru-api` real**: `scripts/demo_parse.py` habla MCP (`mineru_health` → `parse_document` de dos páginas de *Attention Is All You Need*, enviadas en base64) y es la fuente de `docs/assets/demo.gif`, que va bajo el hero del README.
 - `docs/CLIENTS.md` y `examples/` con la config de Claude Code, Cursor, Continue, OpenCode, Hermes Gateway y Claude Desktop (stdio con `uvx`).
 - Plantillas de issue (bug, feature, reporte de seguridad privado) y de PR, y `dependabot.yml` (uv y GitHub Actions).
@@ -19,6 +20,9 @@ y este proyecto adhiere a [Semantic Versioning](https://semver.org/spec/v2.0.0.h
 - README (ES/EN) reorganizado con la estructura de los otros MCP del autor: Quickstart HTTP/stdio, alcance (qué hace y qué no), smoke test con `curl`, troubleshooting con los mensajes reales y sección de documentación.
 
 ### Corregido
+- El wake-on-demand y `mineru_health` llamaban `systemctl` sin `--user`, pero `mineru-api` corre como unit de usuario: el arranque fallaba en silencio (espera de 90 s) y el health lo reportaba inactivo. Ahora usan `systemctl --user` por defecto. El fallback del GPU arbiter sigue parando `comfyui.service` sin `--user` porque es unit de sistema.
+- La descripción de `parse_document` decía que `pipeline` corre sin GPU; usa ~1.1 GB de VRAM.
+- `docs/SERVER_SETUP.md` documenta units de usuario por defecto y el modo system (con regla de polkit), y ya no usa `MINERU_API_URL` ni el puerto `8002`.
 - `serverInfo.version` del `initialize` anunciaba la versión de FastMCP (p. ej. `4.1.1`) en vez de la del paquete; ahora usa la de `mineru-mcp`.
 - `docs/ARCHITECTURE.md` describía endpoints, puertos y tools que ya no existen (`/file/extract`, `8002`, `parse_pdf`, `/tmp/mineru_uploads/`) y decía que `pipeline` no usa la GPU.
 - El README decía que `pipeline` corre sin tocar VRAM; también pide VRAM al GPU Broker (~1.5 GB).

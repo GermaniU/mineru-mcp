@@ -99,6 +99,7 @@ Crea un archivo `.env` o exporta las siguientes variables:
 | `MINERU_BACKEND` | `pipeline` | Backend si la llamada lo deja vacío (`pipeline`, `hybrid-engine`, `vlm-engine`). |
 | `MINERU_PARSE_METHOD` | `auto` | Método de extracción si la llamada lo deja vacío (`auto`, `txt`, `ocr`). |
 | `MINERU_LANG` | `es` | Idioma OCR si la llamada lo deja vacío. |
+| `MINERU_SYSTEMCTL_SCOPE` | `user` | Dónde vive la unit de `mineru-api` para despertarla y consultar su estado: `user` (`systemctl --user`) o `system` (`/etc/systemd/system`). Otro valor impide arrancar el server. |
 | `MCP_HOST` | `0.0.0.0` | Host binding del modo HTTP. |
 | `MCP_PORT` | `8202` | Puerto del modo HTTP. |
 | `MCP_AUTH_TOKEN` | *(vacío = sin auth)* | Si se define, el modo HTTP exige `Authorization: Bearer <token>` en cada request. |
@@ -130,7 +131,7 @@ MinerU MCP es deliberadamente delgado. Hace **una cosa**: llevar documentos de u
 - ✅ PDF, DOCX, PPTX, XLSX, PNG y JPG a Markdown con títulos, tablas (HTML) y fórmulas (LaTeX).
 - ✅ Recibe el documento como ruta del server (`file_path`) o como contenido (`file_base64` + `file_name`) desde otra máquina.
 - ✅ Parseo síncrono para documentos cortos y asíncrono con `task_id` para los largos, con rango de páginas.
-- ✅ Si `mineru-api` está detenido y hay systemd, lo arranca (`systemctl start`) y espera a que responda antes de parsear.
+- ✅ Si `mineru-api` está detenido y hay systemd, lo arranca (`systemctl --user start`, o sin `--user` con `MINERU_SYSTEMCTL_SCOPE=system`) y espera a que responda antes de parsear.
 - ✅ Pide y devuelve la VRAM al GPU Broker cuando el host lo tiene.
 
 ### Lo que NO hace (todavía)
@@ -258,6 +259,9 @@ ruff check .
 
 **`BLOQUEADO por seguridad: MINERU_URL apunta a …`**
 - `MINERU_URL` no es loopback ni `host.docker.internal`. Es a propósito: los documentos no salen de tu máquina. Ver [`SECURITY.md`](SECURITY.md).
+
+**`MinerU no respondió tras 90s de arrancarlo`** o `mineru_health` dice `inactivo` con el backend arriba
+- El scope no coincide con la unit: `MINERU_SYSTEMCTL_SCOPE=user` busca `~/.config/systemd/user/mineru-api.service` y `system` busca `/etc/systemd/system/mineru-api.service`. Con `user`, el MCP tiene que correr en la sesión systemd del mismo usuario (por ejemplo, como unit de usuario). Ver [`docs/SERVER_SETUP.md`](docs/SERVER_SETUP.md).
 
 **`MinerU no responde en … y aquí no hay systemd para arrancarlo`**
 - Corres en Docker o macOS: no hay forma de despertar `mineru-api`. Arráncalo a mano y reintenta.
