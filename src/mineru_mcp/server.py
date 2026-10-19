@@ -2,6 +2,7 @@
 
 import os
 import sys
+from importlib.metadata import version
 
 import uvicorn
 from fastmcp import FastMCP
@@ -13,7 +14,8 @@ from .tools.health import mineru_health
 from .tools.parse import parse_document
 from .tools.tasks import get_task_result, get_task_status, submit_parse_task
 
-mcp = FastMCP("mineru")
+# Sin version, FastMCP anuncia la suya en serverInfo del initialize.
+mcp = FastMCP("mineru", version=version("mineru-mcp"))
 
 
 class BearerAuthMiddleware(BaseHTTPMiddleware):
