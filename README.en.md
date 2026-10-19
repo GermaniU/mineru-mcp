@@ -18,6 +18,12 @@
 
 **Tags:** `mcp-server` · `mineru` · `pdf-parser` · `ocr` · `latex` · `ai-agents` · `fastmcp` · `claude-code` · `cursor` · `hermes-gateway` · `local-first` · `self-hosted`
 
+<p align="center">
+  <img src="docs/assets/demo.gif" alt="The agent sends two pages of a real paper over MCP and gets back Markdown with a LaTeX equation and a table" width="780">
+</p>
+
+<p align="center"><sub>The agent sends a PDF over MCP and gets back Markdown with LaTeX equations and tables — MinerU runs on your server, the client never installs PyTorch. Recorded with <a href="scripts/demo_parse.py"><code>scripts/demo_parse.py</code></a> against a real <code>mineru-api</code>. The demo output is in Spanish.</sub></p>
+
 ---
 
 ## 💡 Why It Exists
@@ -26,59 +32,34 @@ Extracting structured text, complex tables, and mathematical formulas from PDF d
 
 - 🚀 **Zero Local Installation**: Any MCP client parses documents over HTTP/SSE on port `8202` by passing a local `file_path` or sending a Base64 encoded payload in `file_base64`.
 - 📊 **Structured Markdown & LaTeX**: Converts headers, lists, complex tables, and math equations into standard LaTeX ready for RAG pipelines.
-- 🧠 **Flexible Execution (CPU / GPU VRAM)**: Default CPU pipeline without touching VRAM, or optional VLM acceleration coordinated with the GPU Arbiter.
+- 🧠 **The GPU is shared, not fought over**: `pipeline` (default) asks for ~1.5 GB of VRAM; `hybrid-engine` and `vlm-engine` ~4 GB and are more accurate. If the host runs the GPU Broker, every parse requests the VRAM first and hands it back when done, so it coexists with a local LLM on the same card.
 
 ---
 
-## 🏗️ Architecture & Component Boundaries
+## ⚡ Quickstart
 
-> ⚠️ **IMPORTANT: System Boundaries**
->
-> `mineru-mcp` is **strictly the MCP transport & interface layer**. It does NOT include the `mineru-api` processing engine or HuggingFace cached weights.
-> For host server deployment instructions, see [docs/SERVER_SETUP.md](docs/SERVER_SETUP.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+`mineru-mcp` is only the MCP layer: you need a running `mineru-api` (`mineru==3.4.4`). How to set it up on the host: [`docs/SERVER_SETUP.md`](docs/SERVER_SETUP.md).
 
-```
- +-------------------------------------------------------+
- |                 MCP Clients (LAN)                     |
- | (Claude Code CLI / Cursor / Windsurf / Hermes Gateway)|
- +-------------------------------------------------------+
-                             |
-                             | HTTP / SSE (Port 8202)
-                             v
- +-------------------------------------------------------+
- |                   mineru-mcp Server                   |
- |        (FastMCP + File Path / Base64 Decoder)         |
- +-------------------------------------------------------+
-                             |
-                             | Loopback HTTP (Port 8000)
-                             v
- +-------------------------------------------------------+
- |                  MinerU Backend Host                  |
- |  (mineru-api + PDF-Extract-Kit + HuggingFace Cache)   |
- +-------------------------------------------------------+
-```
+There are two ways to run it. Pick one:
 
----
+| Mode | When | How it starts |
+|------|------|---------------|
+| **HTTP** | One server on the `mineru-api` machine, shared by every client on your network (the main use case) | You (or a service) start it and it listens on `http://<server>:8202/mcp`. |
+| **stdio** | The client runs on the same machine as `mineru-api` | The client launches the process itself (`uvx` or Docker). No open port. |
 
-## 📦 Quickstart
-
-### Prerequisites
-- Python 3.11+
-- `uv` (recommended) or `pip`
-
-### Install
+### Option A — HTTP (shared server)
 
 ```bash
 git clone https://github.com/GermaniU/mineru-mcp.git
 cd mineru-mcp
-
-# Create venv and install
-uv venv
-source .venv/bin/activate
+uv venv && source .venv/bin/activate
 uv pip install -e .
+MINERU_URL=http://127.0.0.1:8000 mineru-mcp
 ```
 
-### With Docker (stdio, no clone)
+MCP endpoint: `http://<server>:8202/mcp`. Paste it into your client config (see [`docs/CLIENTS.md`](docs/CLIENTS.md) — Claude Code, Cursor, Continue, OpenCode, Hermes Gateway; written in Spanish, the snippets are universal).
+
+### Option B — stdio with Docker
 
 The `ghcr.io/germaniu/mineru-mcp` image speaks MCP over stdio and calls a `mineru-api` running on the host. Add it to your MCP client:
 
@@ -99,6 +80,12 @@ The `ghcr.io/germaniu/mineru-mcp` image speaks MCP over stdio and calls a `miner
 ```
 
 Inside the container `file_path` refers to the container's file system: send documents with `file_base64` + `file_name`, or mount a directory with `-v`. There is no systemd in the container, so no wake-on-demand and no GPU Broker: `mineru-api` must already be up.
+
+> Without Docker: `uvx --from git+https://github.com/GermaniU/mineru-mcp mineru-mcp --stdio` (config in [`docs/CLIENTS.md`](docs/CLIENTS.md#con-uvx)).
+
+### 🔍 Diagnostics
+
+`mineru_health` reports whether `mineru-api` answers, its version and queued tasks, and tells a **sleeping** backend (stopped for inactivity) apart from a **broken** one. You can call it without an MCP client using the [curl smoke test](#-smoke-test-with-curl).
 
 ---
 
@@ -131,7 +118,30 @@ What each setting protects and what it doesn't: [SECURITY.md](SECURITY.md).
 | `get_task_result` | Markdown of a completed task. |
 | `mineru_health` | `mineru-api` availability, version and queued tasks. |
 
-`hybrid-engine` + `effort=high` + `image_analysis=true` turns figures into Mermaid diagrams.
+`start_page` and `end_page` are 0-based: the demo asks for `start_page: 4, end_page: 5` and gets pages 5 and 6 of the paper. `hybrid-engine` + `effort=high` + `image_analysis=true` turns figures into Mermaid diagrams.
+
+---
+
+## 🎯 Current Scope
+
+MinerU MCP is deliberately thin. It does **one thing**: carry documents from an MCP client to your `mineru-api` and return the Markdown. MinerU does the parsing.
+
+### What it DOES
+- ✅ PDF, DOCX, PPTX, XLSX, PNG and JPG to Markdown with headings, tables (HTML) and formulas (LaTeX).
+- ✅ Takes the document as a server path (`file_path`) or as content (`file_base64` + `file_name`) from another machine.
+- ✅ Synchronous parsing for short documents and asynchronous with a `task_id` for long ones, with page ranges.
+- ✅ If `mineru-api` is stopped and systemd is available, starts it (`systemctl start`) and waits for it to answer before parsing.
+- ✅ Requests and releases VRAM through the GPU Broker when the host has one.
+
+### What it does NOT do (yet)
+- ❌ **It does not ship `mineru-api` or the models.** They are installed separately on the host, with their services: [`docs/SERVER_SETUP.md`](docs/SERVER_SETUP.md).
+- ❌ **It does not send documents outside your network.** If `MINERU_URL` is not loopback it refuses to send them; it does not use MinerU's cloud API.
+- ❌ **It does not return the extracted images**, only the Markdown.
+- ❌ **No partial streaming** of the Markdown on long extractions: use `submit_parse_task` and poll the status.
+- ❌ **It does not store documents or results.** The temporary file for a base64 payload is deleted when the parse ends.
+- ❌ **In Docker there is no wake-on-demand and no GPU Broker:** `mineru-api` must be up.
+
+If you need something from the NOT list, open an [issue](https://github.com/GermaniU/mineru-mcp/issues) with a real use case.
 
 ---
 
@@ -155,39 +165,131 @@ There are three families, and they solve different problems.
 
 ---
 
-## 🔗 Client Integration Guides
+## 🔌 Connect your client
 
-### Claude Code CLI (`~/.claude.json`)
+Copy-paste configuration in [`docs/CLIENTS.md`](docs/CLIENTS.md) (HTTP and stdio):
 
-```json
-{
-  "mcpServers": {
-    "mineru": {
-      "url": "http://<YOUR_SERVER_IP>:8202/mcp"
-    }
-  }
-}
+- 🟦 **Claude Code** — `claude mcp add -s user -t http mineru http://<server>:8202/mcp` (tools show up in new sessions).
+- 🟧 **Cursor** — Settings → MCP Servers → Add new MCP Server.
+- 🟩 **Continue** (VS Code / JetBrains) — `~/.continue/config.json`.
+- 🟪 **OpenCode** — `~/.config/opencode/config.json`.
+- 🟨 **Hermes Gateway** — `mcp_servers` in `~/.hermes/config.yaml`.
+- 🟫 **Claude Desktop** — stdio with `uvx` or Docker, on the `mineru-api` machine.
+
+Ready-made snippets in [`examples/`](examples/).
+
+---
+
+## 🧪 Smoke test with curl
+
+HTTP mode is *stateless*: a single request is enough, no `initialize` and no `mcp-session-id`.
+
+```bash
+curl -sS -X POST http://localhost:8202/mcp \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json, text/event-stream' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"mineru_health","arguments":{}}}'
 ```
 
-### Hermes Gateway (`~/.hermes/config.yaml`)
+With `MCP_AUTH_TOKEN`, add `-H "Authorization: Bearer <token>"`.
 
-```yaml
-mcp_servers:
-  mineru:
-    url: "http://<YOUR_SERVER_IP>:8202/mcp"
-    transport: "http"
+For the full check (health + a real parse of two pages of an arXiv paper), run the GIF demo:
+
+```bash
+MCP_DEMO_URL=http://localhost:8202/mcp python scripts/demo_parse.py
 ```
 
 ---
 
-## 🧪 Running Tests
+## 🧱 Architecture
+
+> ⚠️ **System boundaries:** `mineru-mcp` is **strictly the MCP transport & interface layer**. It does NOT include the `mineru-api` processing engine or HuggingFace cached weights.
+
+```
+ +-------------------------------------------------------+
+ |                 MCP Clients (LAN)                     |
+ | (Claude Code CLI / Cursor / Windsurf / Hermes Gateway)|
+ +-------------------------------------------------------+
+                             |
+                             | HTTP / SSE (Port 8202)
+                             v
+ +-------------------------------------------------------+
+ |                   mineru-mcp Server                   |
+ |        (FastMCP + File Path / Base64 Decoder)         |
+ +-------------------------------------------------------+
+                             |
+                             | Loopback HTTP (Port 8000)
+                             v
+ +-------------------------------------------------------+
+ |                  MinerU Backend Host                  |
+ |  (mineru-api + PDF-Extract-Kit + HuggingFace Cache)   |
+ +-------------------------------------------------------+
+```
+
+Each tool lives in `src/mineru_mcp/tools/`; `server.py` only registers them with FastMCP and starts the transport. Technical details in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
+
+---
+
+## 🤝 Contributing
+
+PRs, issues and forks welcome (MIT).
+
+**Rules (summary):**
+1. **Small, direct changes.** Touch the narrowest code path that explains the problem.
+2. **No speculative abstractions** and no new dependencies unless needed.
+3. **Tool names and parameters are preserved:** clients depend on them.
+4. **Identifiers in English**, comments and commits in Spanish. Conventional Commits (`feat:`, `fix:`, `docs:`, `refactor:`, `test:`, `chore:`).
+
+Full details in [`CONTRIBUTING.md`](CONTRIBUTING.md).
 
 ```bash
-uv run --with pytest --with pytest-asyncio pytest
+uv venv && source .venv/bin/activate
+uv pip install -e ".[dev]"
+pytest          # unit tests, no mineru-api needed
+ruff check .
 ```
+
+---
+
+## 🩹 Troubleshooting
+
+The tools answer in Spanish; the messages below are quoted as they appear.
+
+**`mineru_health` returns `MinerU no disponible (el backend está inactivo)`**
+- `mineru-api` is stopped (for example by an idle watchdog that hands VRAM back). Not an error: `parse_document` or `submit_parse_task` start it.
+
+**`BLOQUEADO por seguridad: MINERU_URL apunta a …`**
+- `MINERU_URL` is neither loopback nor `host.docker.internal`. On purpose: documents do not leave your machine. See [`SECURITY.md`](SECURITY.md).
+
+**`MinerU no responde en … y aquí no hay systemd para arrancarlo`**
+- You are on Docker or macOS: there is no way to wake `mineru-api`. Start it by hand and retry.
+
+**`406 Not Acceptable` when you `curl` the endpoint**
+- The `Accept: application/json, text/event-stream` header is missing.
+
+**`401 {"error":"unauthorized"}`**
+- The server has `MCP_AUTH_TOKEN`: send `Authorization: Bearer <token>`.
+
+**`Error: timeout. El documento puede ser muy grande`**
+- Use `submit_parse_task` and poll `get_task_status`, or parse in ranges with `start_page` / `end_page`.
+
+---
+
+## 📚 Documentation
+
+- [`docs/SERVER_SETUP.md`](docs/SERVER_SETUP.md) — installing `mineru-api`, models and services on the host.
+- [`docs/CLIENTS.md`](docs/CLIENTS.md) — config for Claude Code, Cursor, Continue, OpenCode, Hermes Gateway and Claude Desktop.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — components, request flow and GPU Arbiter.
+- [`SECURITY.md`](SECURITY.md) — threat model and how to report vulnerabilities.
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — dev environment, style rules and workflow.
+- [`CHANGELOG.md`](CHANGELOG.md) — change history.
 
 ---
 
 ## 📄 License
 
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
+[MIT](LICENSE) — use it, fork it, improve it.
+
+---
+
+**Made by [@GermaniU](https://github.com/GermaniU).** If it helped you, a ⭐ helps more people find it. If something broke, open an issue and we'll fix it.

@@ -1,0 +1,9 @@
+{
+  "mcp": {
+    "mineru": {
+      "type": "remote",
+      "url": "http://localhost:8202/mcp",
+      "enabled": true
+    }
+  }
+}

@@ -36,7 +36,21 @@ uv run --with pytest --with pytest-asyncio pytest
 
 # Ejecutar test específico
 uv run --with pytest --with pytest-asyncio pytest tests/test_helpers.py
+
+# Lint (lo mismo que corre la CI, incluye scripts/)
+uv run ruff check .
 ```
+
+### Demo contra un `mineru-api` real
+
+Los tests usan mocks. Para probar el camino completo (MCP → `mineru-api` → Markdown), levanta el server en un puerto libre apuntando a tu `mineru-api` y corre la demo:
+
+```bash
+MINERU_URL=http://127.0.0.1:8000 MCP_HOST=127.0.0.1 MCP_PORT=8299 mineru-mcp
+MCP_DEMO_URL=http://127.0.0.1:8299/mcp python scripts/demo_parse.py
+```
+
+Es la fuente de `docs/assets/demo.gif`. Para regrabarlo: `asciinema rec --idle-time-limit 2` con la terminal en 92×22 y `agg --font-size 16`.
 
 ---
 
@@ -59,4 +73,6 @@ uv run --with pytest --with pytest-asyncio pytest tests/test_helpers.py
    ```
 2. Realiza tus cambios manteniendo los tests pasando.
 3. Escribe commits descriptivos siguiendo la convención de Conventional Commits (`feat:`, `fix:`, `docs:`, `test:`, `refactor:`).
-4. Abre un Pull Request describiendo el propósito y las pruebas realizadas.
+4. Abre un Pull Request con la plantilla del repo (`¿Qué cambia y por qué?` / `¿Cómo lo probaste?`).
+
+¿Un bug o una idea? Usa las plantillas de issue. Los problemas de seguridad van por reporte privado: ver [`SECURITY.md`](SECURITY.md).

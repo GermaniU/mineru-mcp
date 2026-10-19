@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "mineru": {
+      "url": "http://localhost:8202/mcp"
+    }
+  }
+}

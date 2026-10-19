@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "mineru": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/GermaniU/mineru-mcp",
+        "mineru-mcp",
+        "--stdio"
+      ],
+      "env": {
+        "MINERU_URL": "http://127.0.0.1:8000"
+      }
+    }
+  }
+}
