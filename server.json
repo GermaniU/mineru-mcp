@@ -1,0 +1,75 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.GermaniU/mineru-mcp",
+  "title": "MinerU MCP",
+  "description": "Parse PDF, DOCX, PPTX, XLSX and images to Markdown (tables, LaTeX) via a self-hosted MinerU API.",
+  "repository": {
+    "url": "https://github.com/GermaniU/mineru-mcp",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "packages": [
+    {
+      "registryType": "oci",
+      "identifier": "ghcr.io/germaniu/mineru-mcp:0.1.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "runtimeHint": "docker",
+      "runtimeArguments": [
+        {
+          "type": "named",
+          "name": "--add-host",
+          "value": "host.docker.internal:host-gateway",
+          "description": "Lets the container reach a mineru-api running on the Docker host (needed on Linux; harmless on Docker Desktop)."
+        }
+      ],
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "--stdio"
+        }
+      ],
+      "environmentVariables": [
+        {
+          "name": "MINERU_URL",
+          "description": "URL of the mineru-api engine. Only loopback or host.docker.internal is accepted; any other host is treated as external and documents are not sent.",
+          "format": "string",
+          "isRequired": false,
+          "default": "http://host.docker.internal:8000"
+        },
+        {
+          "name": "MINERU_BACKEND",
+          "description": "Backend used when a call leaves backend empty. pipeline needs the least VRAM; hybrid-engine and vlm-engine need ~4GB.",
+          "format": "string",
+          "isRequired": false,
+          "default": "pipeline",
+          "choices": [
+            "pipeline",
+            "hybrid-engine",
+            "vlm-engine"
+          ]
+        },
+        {
+          "name": "MINERU_PARSE_METHOD",
+          "description": "Extraction method used when a call leaves parse_method empty.",
+          "format": "string",
+          "isRequired": false,
+          "default": "auto",
+          "choices": [
+            "auto",
+            "txt",
+            "ocr"
+          ]
+        },
+        {
+          "name": "MINERU_LANG",
+          "description": "OCR language used when a call leaves lang empty.",
+          "format": "string",
+          "isRequired": false,
+          "default": "es"
+        }
+      ]
+    }
+  ]
+}
