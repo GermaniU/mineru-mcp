@@ -47,6 +47,8 @@ Hay dos formas de correrlo. Elige una:
 | **HTTP** | Un server en la máquina de `mineru-api` que comparten todos los clientes de tu red (el uso principal) | Lo arrancas tú (o un servicio) y queda escuchando en `http://<server>:8202/mcp`. |
 | **stdio** | El cliente corre en la misma máquina que `mineru-api` | El cliente lanza el proceso él solo (`uvx` o Docker). No hay puerto abierto. |
 
+> Requisito: `uv` ≥ 0.13.4 (o `pip` ≥ 26.2.2); las versiones anteriores aún confían en la CA emSign comprometida (GHSA-6q48-6c7w-9gw2). `uv pip install -e .` lo comprueba solo (`[tool.uv] required-version` en `pyproject.toml`); `uvx --from git+…` no, porque corre fuera del proyecto: revisa `uv --version`.
+
 ### Opción A — HTTP (server compartido)
 
 ```bash
@@ -81,7 +83,7 @@ La imagen `ghcr.io/germaniu/mineru-mcp` habla MCP por stdio y llama a un `mineru
 
 Dentro del contenedor `file_path` se refiere al sistema de archivos del contenedor: manda los documentos con `file_base64` + `file_name`, o monta un directorio con `-v`. Sin systemd en el contenedor no hay wake-on-demand ni GPU Broker: `mineru-api` tiene que estar ya arriba.
 
-> Sin Docker: `uvx --from git+https://github.com/GermaniU/mineru-mcp mineru-mcp --stdio` (config en [`docs/CLIENTS.md`](docs/CLIENTS.md#con-uvx)).
+> Sin Docker: `uvx --from git+https://github.com/GermaniU/mineru-mcp mineru-mcp --stdio`, con `uv` ≥ 0.13.4 (config en [`docs/CLIENTS.md`](docs/CLIENTS.md#con-uvx)).
 
 ### 🔍 Diagnóstico
 

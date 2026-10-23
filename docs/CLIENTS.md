@@ -112,7 +112,7 @@ Añade un servidor MCP de tipo **Streamable HTTP** (algunos clientes lo llaman *
 
 ### Con `uvx`
 
-Necesitas [`uv`](https://docs.astral.sh/uv/getting-started/installation/). `uvx` descarga el server desde GitHub la primera vez, lo cachea y lo lanza en cada sesión:
+Necesitas [`uv`](https://docs.astral.sh/uv/getting-started/installation/) **≥ 0.13.4** (revisa `uv --version`): las versiones anteriores aún confían en la CA emSign comprometida (GHSA-6q48-6c7w-9gw2), y el mínimo que declara `pyproject.toml` no aplica aquí porque `uvx` no corre dentro del proyecto. Si ya lo usabas con un uv anterior, lánzalo una vez con `uvx --refresh --from …` para que reinstale el server con las dependencias corregidas. `uvx` descarga el server desde GitHub la primera vez, lo cachea y lo lanza en cada sesión:
 
 ```
 uvx --from git+https://github.com/GermaniU/mineru-mcp mineru-mcp --stdio
